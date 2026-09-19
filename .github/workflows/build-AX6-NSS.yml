@@ -3,6 +3,9 @@ name: Build OpenWRT for AX6-NSS
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   REPO_URL: https://github.com/VIKINGYFY/immortalwrt.git
   REPO_BRANCH: main
@@ -204,6 +207,8 @@ jobs:
       uses: dev-drprasad/delete-older-releases@master
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      permissions:
+        contents: write
       with:
         keep_latest: 10
         delete_tags : true
