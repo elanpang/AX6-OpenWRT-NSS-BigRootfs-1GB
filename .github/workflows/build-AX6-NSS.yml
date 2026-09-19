@@ -102,12 +102,12 @@ jobs:
       run: |
         git clone $REPO_URL -b $REPO_BRANCH openwrt
 
-    - name: cache wrt build
-      uses: stupidloud/cachewrtbuild@main
-      with:
-        ccache: 'true'
-        mixkey: AX6-NSS-${{ env.REPO_BRANCH }}
-        prefix: ${{ github.workspace }}/openwrt
+    # - name: cache wrt build
+    #   uses: stupidloud/cachewrtbuild@main
+    #   with:
+    #     ccache: 'true'
+    #     mixkey: AX6-NSS-${{ env.REPO_BRANCH }}
+    #     prefix: ${{ github.workspace }}/openwrt
         
     - name: Update & Install feeds
       working-directory: ./openwrt
@@ -139,13 +139,60 @@ jobs:
         find dl -size -1024c -exec rm -f {} \;
 
     - name: Compile the firmware
+      working-directory: ./openwrt
       run: |
-        chmod -R 755 openwrt
+        # chmod -R 755 openwrt
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "compile_status=success" >> $GITHUB_ENV
 
+            - name: Check disk after compile
+      run: |
+        echo "===== Disk usage ====="
+        df -hT
+        echo
+        echo "===== Inode usage ====="
+        df -i
+
+    - name: Diagnose suspicious kernel modules
+      working-directory: ./openwrt
+      run: |
+        for module in ext4.ko f2fs.ko em_u32.ko; do
+          echo
+          echo "========== $module =========="
+
+          find . -type f -name "$module" -print | while read -r f; do
+            echo "--- $f"
+            ls -lh "$f"
+            hexdump -n 32 -C "$f"
+            sha256sum "$f"
+          done
+        done
+
+    - name: Validate kernel modules
+      working-directory: ./openwrt
+      run: |
+        badfile="$(mktemp)"
+
+        find build_dir -type f -path '*/root-*/lib/modules/*.ko' -print0 |
+        while IFS= read -r -d '' f; do
+          magic="$(hexdump -n 4 -v -e '4/1 "%02x"' "$f")"
+
+          if [ "$magic" != "7f454c46" ]; then
+            echo "BAD MODULE: $magic $f"
+            echo "$f" >> "$badfile"
+          fi
+        done
+
+        if [ -s "$badfile" ]; then
+          echo "ERROR: invalid kernel modules detected"
+          cat "$badfile"
+          exit 1
+        fi
+
+        echo "All rootfs kernel modules passed."
+        
     # - name : Upload packages
       # uses: actions/upload-artifact@master
       # if: always()
