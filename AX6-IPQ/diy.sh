@@ -121,3 +121,29 @@ echo "ath11k NSS compile profile:"
 grep 'CONFIG_ATH11K_NSS_SUPPORT' "$ATH11K_MK"
 
 echo "AX6 1GB ath11k profile applied successfully."
+
+
+# Fix empty /etc/board.json preventing regeneration during preinit
+BOARD_GEN="package/base-files/files/lib/preinit/82_config_generate"
+
+if grep -q '\[ -f /etc/board.json \] || {' "$BOARD_GEN"; then
+    sed -i \
+        's/\[ -f \/etc\/board.json \] || {/[ -s \/etc\/board.json ] || {/' \
+        "$BOARD_GEN"
+    echo "board.json preinit check patched: -f -> -s"
+else
+    echo "ERROR: expected board.json check not found in $BOARD_GEN"
+    exit 1
+fi
+
+BOOT_FILE="package/base-files/files/etc/init.d/boot"
+
+if grep -q '\[ -f /etc/board.json \] && /sbin/wifi config' "$BOOT_FILE"; then
+    sed -i \
+        's/\[ -f \/etc\/board.json \] \&\& \/sbin\/wifi config/[ -s \/etc\/board.json ] \&\& \/sbin\/wifi config/' \
+        "$BOOT_FILE"
+    echo "wifi board.json check patched: -f -> -s"
+else
+    echo "ERROR: expected wifi board.json check not found in $BOOT_FILE"
+    exit 1
+fi
