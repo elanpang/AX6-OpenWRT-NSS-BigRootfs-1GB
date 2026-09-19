@@ -81,3 +81,43 @@ chmod +x "$DIY_DIR/frp/patch_enable.sh"
 
 #修改主机名
 #sed -i "s/hostname='ImmortalWrt'/hostname='Redmi-AX6'/g" package/base-files/files/bin/config_generate
+
+# ============================================================
+# Redmi AX6 1GB RAM - use full ath11k memory profile
+# ============================================================
+
+AX6_DTS="target/linux/qualcommax/dts/ipq8071-ax6.dts"
+ATH11K_MK="package/kernel/mac80211/ath.mk"
+
+echo "Applying AX6 1GB ath11k memory profile..."
+
+# 1. ath11k firmware:
+#    Mode 1 (low-memory) -> Mode 0 (full/default profile)
+if grep -q 'qcom,ath11k-fw-memory-mode = <1>;' "$AX6_DTS"; then
+    sed -i \
+        's/qcom,ath11k-fw-memory-mode = <1>;/qcom,ath11k-fw-memory-mode = <0>;/' \
+        "$AX6_DTS"
+else
+    echo "ERROR: expected ath11k memory mode setting not found in $AX6_DTS"
+    exit 1
+fi
+
+# 2. ath11k driver:
+#    Remove compile-time 512MB memory profile
+if grep -q 'ATH11K_MEM_PROFILE_512M' "$ATH11K_MK"; then
+    sed -i \
+        '/CONFIG_ATH11K_NSS_SUPPORT.*ATH11K_MEM_PROFILE_512M/ s/ ATH11K_MEM_PROFILE_512M//' \
+        "$ATH11K_MK"
+else
+    echo "ERROR: ATH11K_MEM_PROFILE_512M not found in $ATH11K_MK"
+    exit 1
+fi
+
+# Verify
+echo "AX6 DTS memory mode:"
+grep 'ath11k-fw-memory-mode' "$AX6_DTS"
+
+echo "ath11k NSS compile profile:"
+grep 'CONFIG_ATH11K_NSS_SUPPORT' "$ATH11K_MK"
+
+echo "AX6 1GB ath11k profile applied successfully."
