@@ -142,12 +142,12 @@ jobs:
       working-directory: ./openwrt
       run: |
         # chmod -R 755 openwrt
-        cd openwrt
+        # cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "compile_status=success" >> $GITHUB_ENV
 
-            - name: Check disk after compile
+    - name: Check disk after compile
       run: |
         echo "===== Disk usage ====="
         df -hT
